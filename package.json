@@ -1,5 +1,5 @@
 {
-  "name": "loach",
+  "name": "55ab-loach",
   "version": "1.0.3",
   "description": "typescript pattern project",
   "main": "dist/index.cjs.js",
@@ -24,7 +24,7 @@
     "loach",
     "patterns"
   ],
-  "author": "ydq",
+  "author": "55ab",
   "license": "ISC",
   "type": "module",
   "devDependencies": {
