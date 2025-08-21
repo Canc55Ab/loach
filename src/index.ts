@@ -1,1 +1,3 @@
-export { default as QuadTree } from "./quadtree/quad";
+export { default as QuadTree } from "./patterns/quadtree";
+export { default as Queue } from "./patterns/queue";
+export { default as Stack } from "./patterns/stack";
