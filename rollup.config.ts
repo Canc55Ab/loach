@@ -9,19 +9,20 @@ import dts from "rollup-plugin-dts";
 
 const entry = "src/index.ts";
 const outputDir = "dist";
-const outputPreserve = {
-  preserveModules: true,
-  preserveModulesRoot: "src",
-};
 
 const config: RollupOptions[] = [
   {
     input: entry,
-    output: {
-      dir: outputDir,
-      format: "es",
-      ...outputPreserve,
-    },
+    output: [
+      {
+        file: `${outputDir}/index.cjs.js`, // CommonJS 格式输出
+        format: "cjs",
+      },
+      {
+        file: `${outputDir}/index.esm.js`, // ES 模块格式输出
+        format: "es",
+      },
+    ],
     plugins: [
       del({ targets: "dist" }),
       typescript(),
@@ -40,7 +41,8 @@ const config: RollupOptions[] = [
     output: {
       dir: outputDir,
       format: "esm",
-      ...outputPreserve,
+      preserveModules: true,
+      preserveModulesRoot: "src",
     },
     plugins: [dts()],
   },
