@@ -1,7 +1,7 @@
 /**
  * Quad item object interface
  */
-export interface IQuadItemObject {
+interface IQuadItemObject {
   x: number;
   y: number;
   width: number;
