@@ -5,6 +5,7 @@
     "outDir": "dist",
     "rootDir": ".",
     "strict": true,
+    "noImplicitAny": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "moduleResolution": "bundler"

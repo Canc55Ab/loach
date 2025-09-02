@@ -1,18 +1,31 @@
+import { distance } from "../utils/math";
+
+interface IQuadPos {
+  x: number;
+  y: number;
+}
+
 /**
  * Quad item object interface
  */
-interface IQuadItemObject {
-  x: number;
-  y: number;
+interface IQuadItemObjectRect extends IQuadPos {
   width: number;
   height: number;
 }
 
-interface IQuadProps extends IQuadItemObject {
+interface IQuadItemObjectCircle extends IQuadPos {
+  radius: number;
+}
+
+interface IQuadProps extends IQuadPos {
   maxObjects?: number;
   maxLevels?: number;
   level?: number;
+  width: number;
+  height: number;
 }
+
+export type IQuadItemObject = IQuadItemObjectRect | IQuadItemObjectCircle;
 
 /**
  * Quad class
@@ -43,7 +56,7 @@ class QuadTree<T extends IQuadItemObject> {
   }
 
   // 判断是否在范围内
-  public isPointInBounds(point: IQuadItemObject): boolean {
+  public isPointInBounds(point: IQuadPos): boolean {
     return (
       point.x >= this.x &&
       point.x <= this.x + this.width &&
@@ -141,23 +154,53 @@ class QuadTree<T extends IQuadItemObject> {
       verticalMidpoint = this.x + this.width / 2,
       horizontalMidpoint = this.y + this.height / 2;
 
-    const startIsNorth = item.y < horizontalMidpoint,
-      endIsEast = item.x + item.width > verticalMidpoint,
-      endIsSouth = item.y + item.height > horizontalMidpoint,
-      startIsWest = item.x < verticalMidpoint;
+    if ("width" in item && "height" in item) {
+      const rectItem = item as IQuadItemObjectRect;
+      const startIsNorth = rectItem.y < horizontalMidpoint,
+        endIsEast = rectItem.x + rectItem.width > verticalMidpoint,
+        endIsSouth = rectItem.y + rectItem.height > horizontalMidpoint,
+        startIsWest = rectItem.x < verticalMidpoint;
+      if (startIsNorth && endIsEast) {
+        idx.push(1);
+      }
+      if (startIsWest && startIsNorth) {
+        idx.push(0);
+      }
+      if (startIsWest && endIsSouth) {
+        idx.push(3);
+      }
+      if (endIsEast && endIsSouth) {
+        idx.push(2);
+      }
+    } else if ("radius" in item) {
+      const circleItem = item as IQuadItemObjectCircle;
 
-    if (startIsNorth && endIsEast) {
-      idx.push(1);
+      const _distance = distance(
+        circleItem.x,
+        circleItem.y,
+        verticalMidpoint,
+        horizontalMidpoint
+      );
+
+      const startIsNorth = _distance - circleItem.radius < horizontalMidpoint,
+        endIsEast = _distance + circleItem.radius > verticalMidpoint,
+        endIsSouth = _distance + circleItem.radius > horizontalMidpoint,
+        startIsWest = _distance - circleItem.radius < verticalMidpoint;
+
+      if (startIsNorth && endIsEast) {
+        idx.push(1);
+      }
+      if (startIsWest && startIsNorth) {
+        idx.push(0);
+      }
+      if (startIsWest && endIsSouth) {
+        idx.push(3);
+      }
+      if (endIsEast && endIsSouth) {
+        idx.push(2);
+      }
     }
-    if (startIsWest && startIsNorth) {
-      idx.push(0);
-    }
-    if (startIsWest && endIsSouth) {
-      idx.push(3);
-    }
-    if (endIsEast && endIsSouth) {
-      idx.push(2);
-    }
+
     return idx;
   }
 
@@ -180,18 +223,19 @@ class QuadTree<T extends IQuadItemObject> {
    * @returns
    */
   public query(item: T): T[] {
-    const idx = this.getQuadrant(item),
-      returnObjects = this.objects;
+    const returnObjects = new Set<T>(this.objects);
 
     if (this.nodes.length) {
-      let i;
-      for (i = 0; i < idx.length; i++) {
-        const element = idx[i];
-        returnObjects.push(...this.nodes[element].query(item));
+      const idxs = this.getQuadrant(item);
+      for (const idx of idxs) {
+        const subRes = this.nodes[idx].query(item);
+        for (const obj of subRes) {
+          returnObjects.add(obj);
+        }
       }
     }
 
-    return returnObjects;
+    return Array.from(returnObjects);
   }
 }
 
