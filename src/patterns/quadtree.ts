@@ -1,5 +1,9 @@
 import { distance } from "../utils/math";
 
+type ShapeType = "rect" | "circle";
+
+type Quadrant = 0 | 1 | 2 | 3;
+
 interface IQuadPos {
   x: number;
   y: number;
@@ -9,11 +13,13 @@ interface IQuadPos {
  * Quad item object interface
  */
 interface IQuadItemObjectRect extends IQuadPos {
+  shape: ShapeType;
   width: number;
   height: number;
 }
 
 interface IQuadItemObjectCircle extends IQuadPos {
+  shape: ShapeType;
   radius: number;
 }
 
@@ -149,12 +155,12 @@ class QuadTree<T extends IQuadItemObject> {
    * @param item
    * @returns [0, 1, 2, 3]：第一象限，1：第二象限，2：第三象限，3：第四象限
    */
-  private getQuadrant(item: T): number[] {
-    const idx = [],
+  private getQuadrant(item: T): Quadrant[] {
+    const idx: Quadrant[] = [],
       verticalMidpoint = this.x + this.width / 2,
       horizontalMidpoint = this.y + this.height / 2;
 
-    if ("width" in item && "height" in item) {
+    if (item.shape == "rect" && "width" in item && "height" in item) {
       const rectItem = item as IQuadItemObjectRect;
       const startIsNorth = rectItem.y < horizontalMidpoint,
         endIsEast = rectItem.x + rectItem.width > verticalMidpoint,
@@ -172,7 +178,7 @@ class QuadTree<T extends IQuadItemObject> {
       if (endIsEast && endIsSouth) {
         idx.push(2);
       }
-    } else if ("radius" in item) {
+    } else if (item.shape == "circle" && "radius" in item) {
       const circleItem = item as IQuadItemObjectCircle;
 
       const _distance = distance(
