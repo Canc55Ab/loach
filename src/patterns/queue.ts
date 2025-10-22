@@ -1,3 +1,8 @@
+/**
+ * 队列
+ * 先进先出 (FIFO)
+ */
+
 interface IQueueProps {
   maxCount?: number;
 }

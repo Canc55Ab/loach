@@ -1,3 +1,8 @@
+/**
+ * 栈
+ * 后进先出 (LIFO)
+ */
+
 interface IStackProps {
   maxCount?: number;
 }
