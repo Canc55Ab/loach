@@ -1,3 +1,7 @@
+interface IQueueProps {
+  maxCount?: number;
+}
+
 /**
  * 队列
  */
@@ -5,10 +9,21 @@ class Queue {
   count: number = 0;
   lowestCount: number = 0;
   items: any = {};
+  maxCount: number;
+
+  constructor({ maxCount = 1000 }: IQueueProps) {
+    this.maxCount = maxCount;
+  }
 
   // 入队
   public enQueue(dt: any): void {
+    if (this.isFull()) throw { code: 10000, msg: "队列已满" };
     this.items[this.count++] = dt;
+  }
+
+  // 队列是否已满
+  public isFull(): boolean {
+    return this.size() >= this.maxCount;
   }
 
   // 出队

@@ -1,11 +1,23 @@
-class Stack {
-  constructor() {}
+interface IStackProps {
+  maxCount?: number;
+}
 
+class Stack {
+  public maxCount: number;
   private items: Array<any> = [];
+
+  constructor({ maxCount = 1000 }: IStackProps) {
+    this.maxCount = maxCount;
+  }
 
   // 入栈
   push(element: any) {
+    if (this.isFull()) throw { code: 10000, msg: "栈已满" };
     this.items.push(element);
+  }
+
+  pushs(elements: any[]) {
+    this.items.push(...elements);
   }
 
   // 出栈
@@ -16,6 +28,11 @@ class Stack {
   // 返回队尾
   peek() {
     return this.items[this.items.length - 1];
+  }
+
+  // 栈是否已满
+  isFull() {
+    return this.items.length >= this.maxCount;
   }
 
   isEmpty() {
