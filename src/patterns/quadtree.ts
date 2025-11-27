@@ -1,4 +1,4 @@
-import { distance } from "../utils/math";
+import { distance } from "../math";
 
 type ShapeType = "rect" | "circle";
 
