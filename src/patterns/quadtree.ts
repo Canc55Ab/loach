@@ -1,5 +1,3 @@
-import { distance } from "../math";
-
 type ShapeType = "rect" | "circle";
 
 type Quadrant = 0 | 1 | 2 | 3;
@@ -38,64 +36,159 @@ export type IQuadItemObject = IQuadItemObjectRect | IQuadItemObjectCircle;
  * 四叉树
  */
 class QuadTree<T extends IQuadItemObject> {
-  private level: number = 0;
-  public maxObjects: number = 10;
-  public maxLevels: number = 4;
-  public width: number = 0;
-  public height: number = 0;
-  public x: number = 0;
-  public y: number = 0;
-  public nodes: QuadTree<T>[] = [];
-  public objects: T[] = [];
+  private _level: number = 0;
+  private _maxObjects: number = 10;
+  private _maxLevels: number = 4;
+  private _width: number = 0;
+  private _height: number = 0;
+  private _x: number = 0;
+  private _y: number = 0;
+  private _nodes: QuadTree<T>[] = [];
+  private _objects: T[] = [];
 
   constructor(op?: IQuadProps) {
-    if (op?.x) this.x = op.x;
-    if (op?.y) this.y = op.y;
-    if (op?.width) this.width = op.width;
-    if (op?.height) this.height = op.height;
-    if (op?.maxObjects) this.maxObjects = op.maxObjects;
-    if (op?.maxLevels) this.maxLevels = op.maxLevels;
-    if (op?.level) this.level = op.level;
-
-    this.nodes = [];
-    this.objects = [];
+    if (op?.x) this._x = op.x;
+    if (op?.y) this._y = op.y;
+    if (op?.width) this._width = op.width;
+    if (op?.height) this._height = op.height;
+    if (op?.maxObjects) this._maxObjects = op.maxObjects;
+    if (op?.maxLevels) this._maxLevels = op.maxLevels;
+    if (op?.level) this._level = op.level;
   }
 
-  // 判断是否在范围内
+  get x(): number {
+    return this._x;
+  }
+
+  get y(): number {
+    return this._y;
+  }
+
+  get width(): number {
+    return this._width;
+  }
+
+  get height(): number {
+    return this._height;
+  }
+
+  get maxObjects(): number {
+    return this._maxObjects;
+  }
+
+  set maxObjects(value: number) {
+    this._maxObjects = value;
+  }
+
+  get maxLevels(): number {
+    return this._maxLevels;
+  }
+
+  set maxLevels(value: number) {
+    this._maxLevels = value;
+  }
+
+  get nodes(): QuadTree<T>[] {
+    return this._nodes;
+  }
+
+  get objects(): T[] {
+    return this._objects;
+  }
+
+  /**
+   * 获取当前层级
+   */
+  get level(): number {
+    return this._level;
+  }
+
+  /**
+   * 判断是否在范围内
+   */
   public isPointInBounds(point: IQuadPos): boolean {
     return (
-      point.x >= this.x &&
-      point.x <= this.x + this.width &&
-      point.y >= this.y &&
-      point.y <= this.y + this.height
+      point.x >= this._x &&
+      point.x <= this._x + this._width &&
+      point.y >= this._y &&
+      point.y <= this._y + this._height
     );
   }
 
-  // 分割
+  /**
+   * 获取四叉树总深度
+   */
+  public getDepth(): number {
+    if (!this._nodes.length) {
+      return this._level;
+    }
+    return Math.max(...this._nodes.map((node) => node.getDepth()));
+  }
+
+  /**
+   * 获取四叉树中所有对象的总数
+   */
+  public getSize(): number {
+    let count = this._objects.length;
+    for (const node of this._nodes) {
+      count += node.getSize();
+    }
+    return count;
+  }
+
+  /**
+   * 获取四叉树中所有对象
+   */
+  public getAllObjects(): T[] {
+    const result = [...this._objects];
+    for (const node of this._nodes) {
+      result.push(...node.getAllObjects());
+    }
+    return result;
+  }
+
+  /**
+   * 判断四叉树是否包含某个对象
+   */
+  public contains(item: T): boolean {
+    if (this._objects.includes(item)) {
+      return true;
+    }
+    for (const node of this._nodes) {
+      if (node.contains(item)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 分割
+   */
   public subdivide() {
-    if (this.nodes.length) {
+    if (this._nodes.length) {
       return;
     }
 
-    const hw = this.width / 2;
-    const hh = this.height / 2;
-    const coodinates = [
-      { x: this.x, y: this.y },
-      { x: this.x + hw, y: this.y },
-      { x: this.x + hw, y: this.y + hh },
-      { x: this.x, y: this.y + hh },
+    const hw = this._width / 2;
+    const hh = this._height / 2;
+    const coordinates = [
+      { x: this._x, y: this._y },
+      { x: this._x + hw, y: this._y },
+      { x: this._x + hw, y: this._y + hh },
+      { x: this._x, y: this._y + hh },
     ];
 
-    for (let i = 0; i < coodinates.length; i++) {
-      const { x, y } = coodinates[i];
-      this.nodes[i] = new QuadTree({
+    for (let i = 0; i < coordinates.length; i++) {
+      const { x, y } = coordinates[i];
+      this._nodes[i] = new QuadTree<T>({
         x,
         y,
         width: hw,
         height: hh,
-        maxObjects: this.maxObjects,
-        maxLevels: this.maxLevels,
-        level: this.level + 1,
+        maxObjects: this._maxObjects,
+        maxLevels: this._maxLevels,
+        level: this._level + 1,
       });
     }
   }
@@ -106,121 +199,118 @@ class QuadTree<T extends IQuadItemObject> {
    * @returns
    */
   public insert(item: T) {
-    let i = 0,
-      j = 0,
-      idxs,
-      idxs2;
-
-    if (this.nodes.length) {
-      idxs = this.getQuadrant(item);
-      for (i = 0; i < idxs.length; i++) {
-        this.nodes[idxs[i]].insert(item);
+    if (this._nodes.length) {
+      const idxs = this.getQuadrant(item);
+      for (const idx of idxs) {
+        this._nodes[idx].insert(item);
       }
       return;
     }
 
-    this.objects.push(item);
+    this._objects.push(item);
 
-    if (this.objects.length > this.maxObjects && this.level < this.maxLevels) {
-      if (!this.nodes.length) {
+    if (this._objects.length > this._maxObjects && this._level < this._maxLevels) {
+      if (!this._nodes.length) {
         this.subdivide();
       }
 
       // 切分象限之后将现有的对象插入到子象限
-      for (i = 0; i < this.objects.length; i++) {
-        idxs2 = this.getQuadrant(this.objects[i]);
-        for (j = 0; j < idxs2.length; j++) {
-          this.nodes[idxs2[j]].insert(this.objects[i]);
+      for (const obj of this._objects) {
+        const idxs = this.getQuadrant(obj);
+        for (const idx of idxs) {
+          this._nodes[idx].insert(obj);
         }
       }
 
-      this.objects = [];
+      this._objects = [];
     }
   }
 
   /**
    * 插入对象列表
-   * @param item
-   * @returns
+   * @param items
    */
   public inserts(items: T[]) {
-    for (let i = 0; i < items.length; i++) {
-      const element = items[i];
-      this.insert(element);
+    for (const item of items) {
+      this.insert(item);
     }
   }
 
   /**
    * 获取对象所处的象限
    * @param item
-   * @returns [0, 1, 2, 3]：第一象限，1：第二象限，2：第三象限，3：第四象限
+   * @returns [0, 1, 2, 3]：0-左上，1-右上，2-右下，3-左下
    */
   private getQuadrant(item: T): Quadrant[] {
-    const idx: Quadrant[] = [],
-      verticalMidpoint = this.x + this.width / 2,
-      horizontalMidpoint = this.y + this.height / 2;
+    const idx: Quadrant[] = [];
+    const verticalMidpoint = this._x + this._width / 2;
+    const horizontalMidpoint = this._y + this._height / 2;
 
-    if (item.shape == "rect" && "width" in item && "height" in item) {
+    let startIsNorth: boolean, endIsEast: boolean, endIsSouth: boolean, startIsWest: boolean;
+
+    if (item.shape === "rect" && "width" in item && "height" in item) {
       const rectItem = item as IQuadItemObjectRect;
-      const startIsNorth = rectItem.y < horizontalMidpoint,
-        endIsEast = rectItem.x + rectItem.width > verticalMidpoint,
-        endIsSouth = rectItem.y + rectItem.height > horizontalMidpoint,
-        startIsWest = rectItem.x < verticalMidpoint;
-      if (startIsNorth && endIsEast) {
-        idx.push(1);
-      }
-      if (startIsWest && startIsNorth) {
-        idx.push(0);
-      }
-      if (startIsWest && endIsSouth) {
-        idx.push(3);
-      }
-      if (endIsEast && endIsSouth) {
-        idx.push(2);
-      }
-    } else if (item.shape == "circle" && "radius" in item) {
+      startIsNorth = rectItem.y < horizontalMidpoint;
+      endIsEast = rectItem.x + rectItem.width > verticalMidpoint;
+      endIsSouth = rectItem.y + rectItem.height > horizontalMidpoint;
+      startIsWest = rectItem.x < verticalMidpoint;
+    } else if (item.shape === "circle" && "radius" in item) {
       const circleItem = item as IQuadItemObjectCircle;
+      // 圆形使用其边界框来判断象限归属
+      startIsNorth = circleItem.y - circleItem.radius < horizontalMidpoint;
+      endIsEast = circleItem.x + circleItem.radius > verticalMidpoint;
+      endIsSouth = circleItem.y + circleItem.radius > horizontalMidpoint;
+      startIsWest = circleItem.x - circleItem.radius < verticalMidpoint;
+    } else {
+      return idx;
+    }
 
-      const _distance = distance(
-        circleItem.x,
-        circleItem.y,
-        verticalMidpoint,
-        horizontalMidpoint
-      );
-
-      const startIsNorth = _distance - circleItem.radius < horizontalMidpoint,
-        endIsEast = _distance + circleItem.radius > verticalMidpoint,
-        endIsSouth = _distance + circleItem.radius > horizontalMidpoint,
-        startIsWest = _distance - circleItem.radius < verticalMidpoint;
-
-      if (startIsNorth && endIsEast) {
-        idx.push(1);
-      }
-      if (startIsWest && startIsNorth) {
-        idx.push(0);
-      }
-      if (startIsWest && endIsSouth) {
-        idx.push(3);
-      }
-      if (endIsEast && endIsSouth) {
-        idx.push(2);
-      }
+    if (startIsNorth && startIsWest) {
+      idx.push(0);
+    }
+    if (startIsNorth && endIsEast) {
+      idx.push(1);
+    }
+    if (endIsEast && endIsSouth) {
+      idx.push(2);
+    }
+    if (startIsWest && endIsSouth) {
+      idx.push(3);
     }
 
     return idx;
   }
 
   /**
+   * 移除对象
+   * @param item 要移除的对象
+   * @returns 是否成功移除
+   */
+  public remove(item: T): boolean {
+    const index = this._objects.indexOf(item);
+    if (index !== -1) {
+      this._objects.splice(index, 1);
+      return true;
+    }
+
+    for (const node of this._nodes) {
+      if (node.remove(item)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * 清除
    */
   public clear() {
-    this.objects = [];
-    for (let i = 0; i < this.nodes.length; i++) {
-      if (this.nodes.length) {
-        this.nodes[i].clear();
-      }
+    this._objects = [];
+    for (const node of this._nodes) {
+      node.clear();
     }
-    this.nodes = [];
+    this._nodes = [];
   }
 
   /**
@@ -229,12 +319,12 @@ class QuadTree<T extends IQuadItemObject> {
    * @returns
    */
   public query(item: T): T[] {
-    const returnObjects = new Set<T>(this.objects);
+    const returnObjects = new Set<T>(this._objects);
 
-    if (this.nodes.length) {
+    if (this._nodes.length) {
       const idxs = this.getQuadrant(item);
       for (const idx of idxs) {
-        const subRes = this.nodes[idx].query(item);
+        const subRes = this._nodes[idx].query(item);
         for (const obj of subRes) {
           returnObjects.add(obj);
         }
@@ -242,6 +332,69 @@ class QuadTree<T extends IQuadItemObject> {
     }
 
     return Array.from(returnObjects);
+  }
+
+  /**
+   * 查询指定范围内的所有对象
+   * @param range 矩形范围
+   */
+  public queryRange(range: IQuadItemObjectRect): T[] {
+    const result = new Set<T>();
+
+    // 检查当前节点范围是否与查询范围相交
+    if (!this.intersects(range)) {
+      return [];
+    }
+
+    for (const obj of this._objects) {
+      if (this.itemIntersectsRange(obj, range)) {
+        result.add(obj);
+      }
+    }
+
+    for (const node of this._nodes) {
+      const subRes = node.queryRange(range);
+      for (const obj of subRes) {
+        result.add(obj);
+      }
+    }
+
+    return Array.from(result);
+  }
+
+  /**
+   * 判断矩形范围是否与当前节点相交
+   */
+  private intersects(range: IQuadItemObjectRect): boolean {
+    return !(
+      range.x > this._x + this._width ||
+      range.x + range.width < this._x ||
+      range.y > this._y + this._height ||
+      range.y + range.height < this._y
+    );
+  }
+
+  /**
+   * 判断对象是否与指定范围相交
+   */
+  private itemIntersectsRange(item: T, range: IQuadItemObjectRect): boolean {
+    if (item.shape === "rect" && "width" in item && "height" in item) {
+      const rectItem = item as IQuadItemObjectRect;
+      return !(
+        rectItem.x > range.x + range.width ||
+        rectItem.x + rectItem.width < range.x ||
+        rectItem.y > range.y + range.height ||
+        rectItem.y + rectItem.height < range.y
+      );
+    } else if (item.shape === "circle" && "radius" in item) {
+      const circleItem = item as IQuadItemObjectCircle;
+      const closestX = Math.max(range.x, Math.min(circleItem.x, range.x + range.width));
+      const closestY = Math.max(range.y, Math.min(circleItem.y, range.y + range.height));
+      const dx = circleItem.x - closestX;
+      const dy = circleItem.y - closestY;
+      return dx * dx + dy * dy <= circleItem.radius * circleItem.radius;
+    }
+    return false;
   }
 }
 
