@@ -10,9 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build",
-    "publishPatch": "npm version patch && npm publish",
-    "publishMinor": "npm version minor && npm publish",
-    "publishMajor": "npm version major && npm publish"
+    "publishPatch": "npm login && npm version patch && npm publish",
+    "publishMinor": "npm login && npm version minor && npm publish",
+    "publishMajor": "npm login && npm version major && npm publish"
   },
   "repository": {
     "type": "git",
