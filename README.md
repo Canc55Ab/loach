@@ -11,7 +11,7 @@ npm install 55ab-loach
 ## 使用
 
 ```typescript
-import { Stack, Queue, QuadTree, math } from "55ab-loach";
+import { Stack, Queue, QuadTree, AsyncQueue, math } from "55ab-loach";
 ```
 
 ---
@@ -164,6 +164,71 @@ const nearby = qt.queryRange({
   width: 40,
   height: 40,
 });
+```
+
+---
+
+## AsyncQueue 异步队列
+
+并发控制的异步函数执行队列，支持任务调度、暂停/恢复、优先级和事件订阅。
+
+### 构造
+
+```typescript
+const queue = new AsyncQueue<number, number>({
+  concurrency: 3,       // 最大并发数，默认 1
+  timeout: 5000,        // 任务超时时间（ms），默认 0（不超时）
+  retryCount: 2,        // 失败重试次数，默认 0
+  retryDelay: 1000,     // 重试间隔（ms），默认 1000
+  autoStart: true,      // 是否自动开始，默认 true
+});
+```
+
+### API
+
+| 方法                | 说明                         |
+| ------------------- | ---------------------------- |
+| `enqueue(task, priority?)` | 添加任务，支持优先级       |
+| `start()`           | 开始执行队列                 |
+| `pause()`           | 暂停执行                     |
+| `resume()`          | 恢复执行                     |
+| `clear()`           | 清空队列                     |
+| `abort()`           | 中止所有任务                 |
+| `getStats()`        | 获取队列统计信息             |
+| `on(event, handler)` | 订阅事件                   |
+| `off(event, handler)` | 取消订阅                   |
+
+### 事件
+
+| 事件             | 说明                           |
+| ---------------- | ------------------------------ |
+| `taskStart`      | 任务开始                       |
+| `taskEnd`        | 任务完成                       |
+| `taskError`      | 任务错误                       |
+| `taskRetry`      | 任务重试                       |
+| `queueEmpty`     | 队列空                         |
+| `queueFull`      | 队列满                         |
+| `pause`          | 暂停                           |
+| `resume`         | 恢复                           |
+| `statsUpdate`    | 统计更新                       |
+
+### 示例
+
+```typescript
+const queue = new AsyncQueue<string, number>({ concurrency: 2 });
+
+queue.on("taskEnd", ({ result }) => {
+  console.log("任务完成:", result);
+});
+
+queue.enqueue(async () => {
+  const response = await fetch("https://api.example.com/data");
+  return response.json();
+});
+
+queue.enqueue(async () => "second task", 1); // 高优先级
+
+queue.start();
 ```
 
 ---
