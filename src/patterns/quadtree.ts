@@ -8,6 +8,16 @@ interface IQuadPos {
 }
 
 /**
+ * 轴对齐包围盒
+ */
+interface IQuadBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
  * Quad item object interface
  */
 interface IQuadItemObjectRect extends IQuadPos {
@@ -127,24 +137,26 @@ class QuadTree<T extends IQuadItemObject> {
 
   /**
    * 获取四叉树中所有对象的总数
+   *
+   * 跨象限的对象会在多个子节点中各存一份，这里按**唯一对象**计数
    */
   public getSize(): number {
-    let count = this._objects.length;
-    for (const node of this._nodes) {
-      count += node.getSize();
-    }
-    return count;
+    return this.getAllObjects().length;
   }
 
   /**
    * 获取四叉树中所有对象
+   *
+   * 跨象限对象会出现在多个子节点中，这里按引用去重
    */
   public getAllObjects(): T[] {
-    const result = [...this._objects];
+    const result = new Set<T>(this._objects);
     for (const node of this._nodes) {
-      result.push(...node.getAllObjects());
+      for (const obj of node.getAllObjects()) {
+        result.add(obj);
+      }
     }
-    return result;
+    return Array.from(result);
   }
 
   /**
@@ -201,6 +213,11 @@ class QuadTree<T extends IQuadItemObject> {
   public insert(item: T) {
     if (this._nodes.length) {
       const idxs = this.getQuadrant(item);
+      if (!idxs.length) {
+        // 无法归入任何象限（如完全落在树范围之外）：保留在当前节点，避免对象丢失
+        this._objects.push(item);
+        return;
+      }
       for (const idx of idxs) {
         this._nodes[idx].insert(item);
       }
@@ -215,14 +232,20 @@ class QuadTree<T extends IQuadItemObject> {
       }
 
       // 切分象限之后将现有的对象插入到子象限
+      const remain: T[] = [];
       for (const obj of this._objects) {
         const idxs = this.getQuadrant(obj);
+        if (!idxs.length) {
+          // 无法归入任何象限：留在当前节点
+          remain.push(obj);
+          continue;
+        }
         for (const idx of idxs) {
           this._nodes[idx].insert(obj);
         }
       }
 
-      this._objects = [];
+      this._objects = remain;
     }
   }
 
@@ -238,68 +261,76 @@ class QuadTree<T extends IQuadItemObject> {
 
   /**
    * 获取对象所处的象限
+   *
+   * 判定依据是对象的包围盒与子象限是否**真实相交**（边界相切不算相交），
+   * 完全落在本节点范围之外的对象不属于任何象限，由 insert 保留在当前节点
    * @param item
    * @returns [0, 1, 2, 3]：0-左上，1-右上，2-右下，3-左下
    */
   private getQuadrant(item: T): Quadrant[] {
     const idx: Quadrant[] = [];
-    const verticalMidpoint = this._x + this._width / 2;
-    const horizontalMidpoint = this._y + this._height / 2;
+    const bounds = this.getItemBounds(item);
 
-    let startIsNorth: boolean, endIsEast: boolean, endIsSouth: boolean, startIsWest: boolean;
-
-    if (item.shape === "rect" && "width" in item && "height" in item) {
-      const rectItem = item as IQuadItemObjectRect;
-      startIsNorth = rectItem.y < horizontalMidpoint;
-      endIsEast = rectItem.x + rectItem.width > verticalMidpoint;
-      endIsSouth = rectItem.y + rectItem.height > horizontalMidpoint;
-      startIsWest = rectItem.x < verticalMidpoint;
-    } else if (item.shape === "circle" && "radius" in item) {
-      const circleItem = item as IQuadItemObjectCircle;
-      // 圆形使用其边界框来判断象限归属
-      startIsNorth = circleItem.y - circleItem.radius < horizontalMidpoint;
-      endIsEast = circleItem.x + circleItem.radius > verticalMidpoint;
-      endIsSouth = circleItem.y + circleItem.radius > horizontalMidpoint;
-      startIsWest = circleItem.x - circleItem.radius < verticalMidpoint;
-    } else {
-      return idx;
-    }
-
-    if (startIsNorth && startIsWest) {
-      idx.push(0);
-    }
-    if (startIsNorth && endIsEast) {
-      idx.push(1);
-    }
-    if (endIsEast && endIsSouth) {
-      idx.push(2);
-    }
-    if (startIsWest && endIsSouth) {
-      idx.push(3);
+    for (let i = 0; i < this._nodes.length; i++) {
+      const node = this._nodes[i];
+      if (
+        bounds.maxX > node.x &&
+        bounds.minX < node.x + node.width &&
+        bounds.maxY > node.y &&
+        bounds.minY < node.y + node.height
+      ) {
+        idx.push(i as Quadrant);
+      }
     }
 
     return idx;
   }
 
   /**
+   * 计算对象的轴对齐包围盒
+   */
+  private getItemBounds(item: T): IQuadBounds {
+    if (item.shape === "circle" && "radius" in item) {
+      const circleItem = item as IQuadItemObjectCircle;
+      return {
+        minX: circleItem.x - circleItem.radius,
+        minY: circleItem.y - circleItem.radius,
+        maxX: circleItem.x + circleItem.radius,
+        maxY: circleItem.y + circleItem.radius,
+      };
+    }
+    const rectItem = item as IQuadItemObjectRect;
+    return {
+      minX: rectItem.x,
+      minY: rectItem.y,
+      maxX: rectItem.x + rectItem.width,
+      maxY: rectItem.y + rectItem.height,
+    };
+  }
+
+  /**
    * 移除对象
+   *
+   * 跨象限对象在多个子节点中各存一份，这里会**移除全部副本**
    * @param item 要移除的对象
    * @returns 是否成功移除
    */
   public remove(item: T): boolean {
+    let removed = false;
+
     const index = this._objects.indexOf(item);
     if (index !== -1) {
       this._objects.splice(index, 1);
-      return true;
+      removed = true;
     }
 
     for (const node of this._nodes) {
       if (node.remove(item)) {
-        return true;
+        removed = true;
       }
     }
 
-    return false;
+    return removed;
   }
 
   /**
@@ -336,15 +367,12 @@ class QuadTree<T extends IQuadItemObject> {
 
   /**
    * 查询指定范围内的所有对象
-   * @param range 矩形范围
+   *
+   * 当前节点自身的对象始终参与判定（其中可能包含落在树范围之外的对象），
+   * 子节点只在与其范围相交时才递归
    */
   public queryRange(range: IQuadItemObjectRect): T[] {
     const result = new Set<T>();
-
-    // 检查当前节点范围是否与查询范围相交
-    if (!this.intersects(range)) {
-      return [];
-    }
 
     for (const obj of this._objects) {
       if (this.itemIntersectsRange(obj, range)) {
@@ -353,6 +381,7 @@ class QuadTree<T extends IQuadItemObject> {
     }
 
     for (const node of this._nodes) {
+      if (!node.intersects(range)) continue;
       const subRes = node.queryRange(range);
       for (const obj of subRes) {
         result.add(obj);

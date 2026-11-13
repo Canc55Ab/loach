@@ -829,8 +829,8 @@ describe("QuadTree", () => {
         qt.insert(item);
       }
 
-      // getSize 计算的是实际存储的对象引用数（跨象限对象会被重复存储）
-      expect(qt.getSize()).toBeGreaterThanOrEqual(100);
+      // getSize 统计的是唯一对象数（跨象限对象只计一次）
+      expect(qt.getSize()).toBe(100);
 
       // 查询某个对象附近的对象
       const result = qt.query(items[0]);
@@ -966,6 +966,73 @@ describe("QuadTree", () => {
       expect(result).toContain(nearby1);
       expect(result).toContain(nearby2);
       expect(result).not.toContain(farAway);
+    });
+  });
+
+  describe("跨象限去重与越界对象", () => {
+    it("跨象限对象只计一次", () => {
+      const qt = new QuadTree<IQuadItemObject>({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        maxObjects: 1,
+        maxLevels: 3,
+      });
+
+      const normal = createRect(10, 10, 5, 5);
+      // 跨越 x=50 中线，会被存进多个子节点
+      const straddling = createRect(40, 10, 60, 5);
+
+      qt.inserts([normal, straddling]);
+
+      expect(qt.getSize()).toBe(2);
+      expect(qt.getAllObjects().length).toBe(2);
+      expect(qt.getAllObjects()).toContain(straddling);
+    });
+
+    it("移除跨象限对象后不再残留", () => {
+      const qt = new QuadTree<IQuadItemObject>({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        maxObjects: 1,
+        maxLevels: 3,
+      });
+
+      const straddling = createRect(40, 10, 60, 5);
+      qt.inserts([createRect(10, 10, 5, 5), straddling]);
+
+      expect(qt.remove(straddling)).toBe(true);
+      expect(qt.getSize()).toBe(1);
+      expect(qt.contains(straddling)).toBe(false);
+    });
+
+    it("完全落在树范围之外的对象不会丢失", () => {
+      const qt = new QuadTree<IQuadItemObject>({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        maxObjects: 1,
+        maxLevels: 3,
+      });
+
+      const outside = createRect(500, 500, 5, 5);
+      qt.inserts([createRect(10, 10, 5, 5), outside]);
+
+      expect(qt.getSize()).toBe(2);
+      expect(qt.getAllObjects()).toContain(outside);
+
+      const result = qt.queryRange({
+        shape: "rect",
+        x: 495,
+        y: 495,
+        width: 20,
+        height: 20,
+      });
+      expect(result).toContain(outside);
     });
   });
 });

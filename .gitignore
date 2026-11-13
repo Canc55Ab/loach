@@ -216,3 +216,9 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/node,macos,windows,git
+
+# npm 本地配置（含认证 token，绝不能提交）
+.npmrc
+
+# npm 本地缓存
+.npm-cache/
