@@ -776,3 +776,43 @@ npm run test:coverage  # 运行测试并输出 v8 覆盖率
 npm run typecheck      # 类型检查（src + tests）
 npm run build          # 构建
 ```
+
+---
+
+## 发布
+
+发布由 GitHub Actions 自动完成，采用 **npm Trusted Publishing（OIDC）** 认证——仓库不保存任何长期 npm token，npm 凭据由 GitHub 运行时签发的短期身份令牌换取，并自动附带 provenance 溯源。
+
+### 一次性配置
+
+| 平台 | 配置项 |
+| --- | --- |
+| GitHub | Settings → Environments → 新建 `npm-publish` → 勾选 **Required reviewers** 并添加自己 |
+| npmjs.com | 包 `55ab-loach` → Settings → Trusted Publisher → GitHub Actions → 填 `Canc55Ab` / `loach` / `release.yml` / `npm-publish` |
+
+### 发布流程
+
+```bash
+# 1. 改 package.json 的 version，再提交推送
+npm version patch        # 或 minor / major
+
+# 2. 打同名 tag 并推送，CI 自动触发
+git tag v2.0.1 && git push origin main --tags
+```
+
+推送 tag 后，CI 会依次执行：
+
+1. 安装依赖 → 类型检查 → 单元测试 → 构建
+2. **校验 tag 版本与 `package.json` 的 `version` 是否一致**，不一致直接失败
+3. 打包产物并上传为 artifact
+4. 停在 `npm-publish` 环境，**等待你在 Actions 页面点击 Approve and deploy**
+5. 审批通过后发布到 npmjs（`latest` tag），并生成 provenance 证明
+
+> 第 4 步就是发布前的最后确认点：不点击 Approve 不会真正发到 npm。
+
+### 工作流说明
+
+| 工作流 | 触发条件 | 作用 |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | push / PR 到 `main` | 类型检查、测试、构建、打包演练 |
+| `.github/workflows/release.yml` | 推送 `v*` tag | 校验 → 构建 → **人工审批** → 发布到 npmjs |

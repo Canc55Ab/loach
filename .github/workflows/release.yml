@@ -1,0 +1,99 @@
+# 发布工作流：推 tag 后自动构建，发布前需人工审批
+#
+# 认证方式：npm Trusted Publishing（OIDC）——不需要长期 npm token，
+# 由 GitHub Actions 运行时向 npm 换取短期发布凭据，并自动附带 provenance 溯源。
+#
+# 触发方式：推送 v* 形式的 tag，package.json 的 version 必须与 tag 一致，否则直接失败。
+#
+# 人工审批：publish job 绑定 `npm-publish` 环境。
+# 该环境在仓库 Settings → Environments 中配置 Required reviewers，
+# 未点击 Approve and deploy 前不会执行 npm publish。
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# 默认最小权限；OIDC 所需的 id-token 在 publish job 单独提升
+permissions:
+  contents: read
+
+jobs:
+  # 1) 构建与校验：不碰 npm registry，纯本地验证
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # tag 与 package.json 版本必须一致，防止发了和 tag 对不上的版本号
+      - name: Verify version matches tag
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          TAG_VERSION="${TAG_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag ${TAG_NAME} 的版本 ${TAG_VERSION} 与 package.json 版本 ${PKG_VERSION} 不一致"
+            exit 1
+          fi
+          echo "版本校验通过：${PKG_VERSION}"
+
+      - name: Pack
+        run: npm pack
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: 55ab-loach-*.tgz
+          if-no-files-found: error
+
+  # 2) 发布：绑定 npm-publish 环境，需人工审批后才真正发布
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    # 人工审批门：需在仓库 Settings → Environments → npm-publish 中配置 Required reviewers
+    environment: npm-publish
+    permissions:
+      contents: read
+      # OIDC：向 GitHub 换取短期身份令牌，用于 npm Trusted Publishing
+      id-token: write
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+
+      # Trusted Publishing 场景下 npm CLI 自动走 OIDC，无需 NPM_TOKEN；
+      # public 包 + 公开仓库会自动生成 provenance 证明
+      - name: Publish
+        run: npm publish --provenance --access public
